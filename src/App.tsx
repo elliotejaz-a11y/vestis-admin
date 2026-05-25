@@ -102,7 +102,7 @@ function FunnelChart({ stats, downloads }: { stats: Stats; downloads: number }) 
       label: 'Added to Wardrobe',
       value: stats.usersWithItems,
       color: 'bg-blue-500',
-      description: 'Added at least 1 clothing item',
+      description: 'Ever added at least 1 clothing item',
     },
     {
       label: 'Generated Outfits',
@@ -193,7 +193,7 @@ export default function App() {
     setLoadError(null)
 
     const [profilesRes, itemsRes, outfitsRes] = await Promise.all([
-      supabase.from('profiles').select('id, display_name, username, created_at'),
+      supabase.from('profiles').select('id, display_name, username, created_at, has_ever_added_item'),
       supabase.from('clothing_items').select('user_id'),
       supabase.from('outfits').select('user_id'),
     ])
@@ -222,7 +222,7 @@ export default function App() {
 
     setStats({
       totalUsers: rows.length,
-      usersWithItems: rows.filter(u => u.item_count > 0).length,
+      usersWithItems: (profilesRes.data || []).filter((u: any) => u.has_ever_added_item).length,
       usersWithOutfits: rows.filter(u => u.outfit_count > 0).length,
       totalItems: rows.reduce((s, u) => s + u.item_count, 0),
       totalOutfits: rows.reduce((s, u) => s + u.outfit_count, 0),
@@ -308,7 +308,7 @@ export default function App() {
           {stats ? (
             <>
               <StatCard label="Total Users" value={stats.totalUsers} />
-              <StatCard label="Have Wardrobe Items" value={stats.usersWithItems} sub={pct(stats.usersWithItems, stats.totalUsers)} />
+              <StatCard label="Ever Added Item" value={stats.usersWithItems} sub={pct(stats.usersWithItems, stats.totalUsers)} />
               <StatCard label="Generated Outfits" value={stats.usersWithOutfits} sub={pct(stats.usersWithOutfits, stats.totalUsers)} />
               <StatCard label="Total Items Added" value={stats.totalItems} />
               <StatCard label="Total Outfits Made" value={stats.totalOutfits} />
