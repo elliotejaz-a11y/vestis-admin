@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase, supabaseMisconfigured } from './lib/supabase'
 
 const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD as string
+const DOWNLOADS_KEY = 'vestis_admin_downloads'
 
 interface UserRow {
   id: string
@@ -30,13 +31,13 @@ function StatCard({ label, value, sub }: { label: string; value: number; sub?: s
   )
 }
 
-const DOWNLOADS_KEY = 'vestis_admin_downloads'
-
-function DownloadsCard() {
-  const [downloads, setDownloads] = useState<number>(() => {
-    const saved = localStorage.getItem(DOWNLOADS_KEY)
-    return saved ? parseInt(saved, 10) : 0
-  })
+function DownloadsCard({
+  downloads,
+  onChange,
+}: {
+  downloads: number
+  onChange: (n: number) => void
+}) {
   const [editing, setEditing] = useState(false)
   const [input, setInput] = useState('')
 
@@ -47,10 +48,7 @@ function DownloadsCard() {
 
   function save() {
     const n = parseInt(input.replace(/[^0-9]/g, ''), 10)
-    if (!isNaN(n)) {
-      setDownloads(n)
-      localStorage.setItem(DOWNLOADS_KEY, n.toString())
-    }
+    if (!isNaN(n)) onChange(n)
     setEditing(false)
   }
 
@@ -86,8 +84,14 @@ function DownloadsCard() {
   )
 }
 
-function FunnelChart({ stats }: { stats: Stats }) {
+function FunnelChart({ stats, downloads }: { stats: Stats; downloads: number }) {
   const steps = [
+    {
+      label: 'Total Downloads',
+      value: downloads,
+      color: 'bg-purple-500',
+      description: 'App downloaded',
+    },
     {
       label: 'Total Users',
       value: stats.totalUsers,
@@ -108,7 +112,7 @@ function FunnelChart({ stats }: { stats: Stats }) {
     },
   ]
 
-  const max = stats.totalUsers || 1
+  const max = downloads || stats.totalUsers || 1
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
@@ -117,7 +121,9 @@ function FunnelChart({ stats }: { stats: Stats }) {
         {steps.map((step, i) => {
           const pct = Math.round((step.value / max) * 100)
           const prevValue = i > 0 ? steps[i - 1].value : null
-          const dropoff = prevValue ? Math.round(((prevValue - step.value) / prevValue) * 100) : null
+          const dropoff = prevValue && prevValue > 0
+            ? Math.round(((prevValue - step.value) / prevValue) * 100)
+            : null
           return (
             <div key={step.label}>
               <div className="flex items-center justify-between mb-1.5">
@@ -138,7 +144,7 @@ function FunnelChart({ stats }: { stats: Stats }) {
               <div className="h-9 bg-gray-100 rounded-lg overflow-hidden">
                 <div
                   className={`h-full ${step.color} rounded-lg transition-all duration-700`}
-                  style={{ width: `${Math.max(pct, pct === 0 ? 0 : 1)}%` }}
+                  style={{ width: `${Math.max(pct, step.value > 0 ? 1 : 0)}%` }}
                 />
               </div>
             </div>
@@ -164,6 +170,19 @@ export default function App() {
     key: 'item_count',
     dir: 'desc',
   })
+  const [downloads, setDownloads] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(DOWNLOADS_KEY)
+      return saved ? parseInt(saved, 10) : 0
+    } catch {
+      return 0
+    }
+  })
+
+  function handleDownloadsChange(n: number) {
+    setDownloads(n)
+    try { localStorage.setItem(DOWNLOADS_KEY, n.toString()) } catch { /* ignore */ }
+  }
 
   useEffect(() => {
     if (authed && !supabaseMisconfigured) loadData()
@@ -179,27 +198,14 @@ export default function App() {
       supabase.from('outfits').select('user_id'),
     ])
 
-    if (profilesRes.error) {
-      setLoadError(`Profiles error: ${profilesRes.error.message}`)
-      setLoading(false)
-      return
-    }
-    if (itemsRes.error) {
-      setLoadError(`Items error: ${itemsRes.error.message}`)
-      setLoading(false)
-      return
-    }
-    if (outfitsRes.error) {
-      setLoadError(`Outfits error: ${outfitsRes.error.message}`)
-      setLoading(false)
-      return
-    }
+    if (profilesRes.error) { setLoadError(`Profiles error: ${profilesRes.error.message}`); setLoading(false); return }
+    if (itemsRes.error) { setLoadError(`Items error: ${itemsRes.error.message}`); setLoading(false); return }
+    if (outfitsRes.error) { setLoadError(`Outfits error: ${outfitsRes.error.message}`); setLoading(false); return }
 
     const itemCounts = new Map<string, number>()
     itemsRes.data?.forEach((i: { user_id: string }) =>
       itemCounts.set(i.user_id, (itemCounts.get(i.user_id) ?? 0) + 1)
     )
-
     const outfitCounts = new Map<string, number>()
     outfitsRes.data?.forEach((o: { user_id: string }) =>
       outfitCounts.set(o.user_id, (outfitCounts.get(o.user_id) ?? 0) + 1)
@@ -226,11 +232,8 @@ export default function App() {
   }
 
   function tryLogin() {
-    if (password === ADMIN_PASSWORD) {
-      setAuthed(true)
-    } else {
-      setAuthError('Incorrect password')
-    }
+    if (password === ADMIN_PASSWORD) { setAuthed(true) }
+    else { setAuthError('Incorrect password') }
   }
 
   if (!authed) {
@@ -305,16 +308,8 @@ export default function App() {
           {stats ? (
             <>
               <StatCard label="Total Users" value={stats.totalUsers} />
-              <StatCard
-                label="Have Wardrobe Items"
-                value={stats.usersWithItems}
-                sub={pct(stats.usersWithItems, stats.totalUsers)}
-              />
-              <StatCard
-                label="Generated Outfits"
-                value={stats.usersWithOutfits}
-                sub={pct(stats.usersWithOutfits, stats.totalUsers)}
-              />
+              <StatCard label="Have Wardrobe Items" value={stats.usersWithItems} sub={pct(stats.usersWithItems, stats.totalUsers)} />
+              <StatCard label="Generated Outfits" value={stats.usersWithOutfits} sub={pct(stats.usersWithOutfits, stats.totalUsers)} />
               <StatCard label="Total Items Added" value={stats.totalItems} />
               <StatCard label="Total Outfits Made" value={stats.totalOutfits} />
             </>
@@ -323,7 +318,7 @@ export default function App() {
               {loading ? 'Loading…' : 'No data'}
             </div>
           )}
-          <DownloadsCard />
+          <DownloadsCard downloads={downloads} onChange={handleDownloadsChange} />
         </div>
 
         {supabaseMisconfigured && (
@@ -338,8 +333,7 @@ export default function App() {
           </div>
         )}
 
-        {stats && <FunnelChart stats={stats} />}
-
+        {stats && <FunnelChart stats={stats} downloads={downloads} />}
 
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="p-4 border-b border-gray-100 flex items-center gap-3">
@@ -361,34 +355,19 @@ export default function App() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 text-left text-gray-500 bg-gray-50">
-                    <th
-                      className="px-4 py-3 font-medium cursor-pointer hover:text-gray-900 select-none"
-                      onClick={() => toggleSort('display_name')}
-                    >
+                    <th className="px-4 py-3 font-medium cursor-pointer hover:text-gray-900 select-none" onClick={() => toggleSort('display_name')}>
                       Name <SortIcon col="display_name" />
                     </th>
-                    <th
-                      className="px-4 py-3 font-medium cursor-pointer hover:text-gray-900 select-none"
-                      onClick={() => toggleSort('username')}
-                    >
+                    <th className="px-4 py-3 font-medium cursor-pointer hover:text-gray-900 select-none" onClick={() => toggleSort('username')}>
                       Username <SortIcon col="username" />
                     </th>
-                    <th
-                      className="px-4 py-3 font-medium cursor-pointer hover:text-gray-900 select-none"
-                      onClick={() => toggleSort('item_count')}
-                    >
+                    <th className="px-4 py-3 font-medium cursor-pointer hover:text-gray-900 select-none" onClick={() => toggleSort('item_count')}>
                       Wardrobe Items <SortIcon col="item_count" />
                     </th>
-                    <th
-                      className="px-4 py-3 font-medium cursor-pointer hover:text-gray-900 select-none"
-                      onClick={() => toggleSort('outfit_count')}
-                    >
+                    <th className="px-4 py-3 font-medium cursor-pointer hover:text-gray-900 select-none" onClick={() => toggleSort('outfit_count')}>
                       Outfits Generated <SortIcon col="outfit_count" />
                     </th>
-                    <th
-                      className="px-4 py-3 font-medium cursor-pointer hover:text-gray-900 select-none"
-                      onClick={() => toggleSort('created_at')}
-                    >
+                    <th className="px-4 py-3 font-medium cursor-pointer hover:text-gray-900 select-none" onClick={() => toggleSort('created_at')}>
                       Joined <SortIcon col="created_at" />
                     </th>
                   </tr>
@@ -396,51 +375,25 @@ export default function App() {
                 <tbody>
                   {filtered.map(u => (
                     <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3 font-medium text-gray-900">
-                        {u.display_name || <span className="text-gray-300">—</span>}
-                      </td>
-                      <td className="px-4 py-3 text-gray-400">
-                        {u.username ? `@${u.username}` : <span className="text-gray-300">—</span>}
-                      </td>
+                      <td className="px-4 py-3 font-medium text-gray-900">{u.display_name || <span className="text-gray-300">—</span>}</td>
+                      <td className="px-4 py-3 text-gray-400">{u.username ? `@${u.username}` : <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                            u.item_count > 0
-                              ? 'bg-green-50 text-green-700'
-                              : 'bg-gray-100 text-gray-400'
-                          }`}
-                        >
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${u.item_count > 0 ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
                           {u.item_count}
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                            u.outfit_count > 0
-                              ? 'bg-blue-50 text-blue-700'
-                              : 'bg-gray-100 text-gray-400'
-                          }`}
-                        >
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${u.outfit_count > 0 ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-400'}`}>
                           {u.outfit_count}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-gray-400">
-                        {u.created_at
-                          ? new Date(u.created_at).toLocaleDateString('en-GB', {
-                              day: 'numeric',
-                              month: 'short',
-                              year: 'numeric',
-                            })
-                          : '—'}
+                        {u.created_at ? new Date(u.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
                       </td>
                     </tr>
                   ))}
                   {filtered.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="px-4 py-12 text-center text-gray-400">
-                        No users found
-                      </td>
-                    </tr>
+                    <tr><td colSpan={5} className="px-4 py-12 text-center text-gray-400">No users found</td></tr>
                   )}
                 </tbody>
               </table>
