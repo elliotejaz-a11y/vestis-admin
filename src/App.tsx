@@ -102,6 +102,7 @@ export default function App() {
   const [users, setUsers] = useState<UserRow[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({
     key: 'item_count',
@@ -114,23 +115,47 @@ export default function App() {
 
   async function loadData() {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('profiles')
-      .select(`id, display_name, username, created_at, clothing_items(count), outfits(count)`)
+    setLoadError(null)
 
-    if (error) {
-      console.error(error)
+    const [profilesRes, itemsRes, outfitsRes] = await Promise.all([
+      supabase.from('profiles').select('id, display_name, username, created_at'),
+      supabase.from('clothing_items').select('user_id'),
+      supabase.from('outfits').select('user_id'),
+    ])
+
+    if (profilesRes.error) {
+      setLoadError(`Profiles error: ${profilesRes.error.message}`)
+      setLoading(false)
+      return
+    }
+    if (itemsRes.error) {
+      setLoadError(`Items error: ${itemsRes.error.message}`)
+      setLoading(false)
+      return
+    }
+    if (outfitsRes.error) {
+      setLoadError(`Outfits error: ${outfitsRes.error.message}`)
       setLoading(false)
       return
     }
 
-    const rows: UserRow[] = (data || []).map((u: any) => ({
+    const itemCounts = new Map<string, number>()
+    itemsRes.data?.forEach((i: { user_id: string }) =>
+      itemCounts.set(i.user_id, (itemCounts.get(i.user_id) ?? 0) + 1)
+    )
+
+    const outfitCounts = new Map<string, number>()
+    outfitsRes.data?.forEach((o: { user_id: string }) =>
+      outfitCounts.set(o.user_id, (outfitCounts.get(o.user_id) ?? 0) + 1)
+    )
+
+    const rows: UserRow[] = (profilesRes.data || []).map((u: any) => ({
       id: u.id,
       display_name: u.display_name,
       username: u.username,
       created_at: u.created_at,
-      item_count: Number(u.clothing_items?.[0]?.count ?? 0),
-      outfit_count: Number(u.outfits?.[0]?.count ?? 0),
+      item_count: itemCounts.get(u.id) ?? 0,
+      outfit_count: outfitCounts.get(u.id) ?? 0,
     }))
 
     setStats({
@@ -235,6 +260,12 @@ export default function App() {
             />
             <StatCard label="Total Items Added" value={stats.totalItems} />
             <StatCard label="Total Outfits Made" value={stats.totalOutfits} />
+          </div>
+        )}
+
+        {loadError && (
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-6 text-sm text-red-700">
+            {loadError}
           </div>
         )}
 
