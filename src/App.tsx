@@ -62,7 +62,7 @@ function DownloadsCard({
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false) }}
-            className="w-full text-2xl font-bold text-gray-900 border-b-2 border-black outline-none bg-transparent"
+            className="w-full text-2xl font-bold text-gray-900 border-b-2 border-black outline-none bg-white px-1"
             autoFocus
           />
           <button onClick={save} className="text-xs font-medium text-white bg-black rounded-lg px-2.5 py-1 shrink-0">Save</button>
