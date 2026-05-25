@@ -30,6 +30,69 @@ function StatCard({ label, value, sub }: { label: string; value: number; sub?: s
   )
 }
 
+function FunnelChart({ stats }: { stats: Stats }) {
+  const steps = [
+    {
+      label: 'Total Users',
+      value: stats.totalUsers,
+      color: 'bg-gray-800',
+      description: 'Signed up',
+    },
+    {
+      label: 'Added to Wardrobe',
+      value: stats.usersWithItems,
+      color: 'bg-blue-500',
+      description: 'Added at least 1 clothing item',
+    },
+    {
+      label: 'Generated Outfits',
+      value: stats.usersWithOutfits,
+      color: 'bg-green-500',
+      description: 'Created at least 1 outfit',
+    },
+  ]
+
+  const max = stats.totalUsers || 1
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+      <h2 className="text-sm font-semibold text-gray-700 mb-5">User Funnel</h2>
+      <div className="space-y-4">
+        {steps.map((step, i) => {
+          const pct = Math.round((step.value / max) * 100)
+          const prevValue = i > 0 ? steps[i - 1].value : null
+          const dropoff = prevValue ? Math.round(((prevValue - step.value) / prevValue) * 100) : null
+          return (
+            <div key={step.label}>
+              <div className="flex items-center justify-between mb-1.5">
+                <div>
+                  <span className="text-sm font-medium text-gray-900">{step.label}</span>
+                  <span className="text-xs text-gray-400 ml-2">{step.description}</span>
+                </div>
+                <div className="flex items-center gap-3 shrink-0 ml-4">
+                  {dropoff !== null && (
+                    <span className="text-xs text-red-400 font-medium">↓ {dropoff}% drop</span>
+                  )}
+                  <span className="text-sm font-bold text-gray-900 w-12 text-right">
+                    {step.value.toLocaleString()}
+                  </span>
+                  <span className="text-xs text-gray-400 w-9 text-right">{pct}%</span>
+                </div>
+              </div>
+              <div className="h-9 bg-gray-100 rounded-lg overflow-hidden">
+                <div
+                  className={`h-full ${step.color} rounded-lg transition-all duration-700`}
+                  style={{ width: `${Math.max(pct, pct === 0 ? 0 : 1)}%` }}
+                />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 type SortKey = keyof UserRow
 
 export default function App() {
@@ -174,6 +237,8 @@ export default function App() {
             <StatCard label="Total Outfits Made" value={stats.totalOutfits} />
           </div>
         )}
+
+        {stats && <FunnelChart stats={stats} />}
 
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="p-4 border-b border-gray-100 flex items-center gap-3">
