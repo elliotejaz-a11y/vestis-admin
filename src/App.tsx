@@ -47,38 +47,35 @@ function DownloadsCard({
   }
 
   function save() {
-    const n = parseInt(input.replace(/[^0-9]/g, ''), 10)
-    if (!isNaN(n)) onChange(n)
+    const n = parseInt(input, 10)
+    if (!isNaN(n) && n >= 0) onChange(n)
     setEditing(false)
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 relative group">
+    <div className="bg-white rounded-xl border border-gray-200 p-5">
       <p className="text-sm text-gray-500">Total Downloads</p>
       {editing ? (
-        <div className="flex items-center gap-2 mt-1">
+        <div className="mt-1">
           <input
-            type="number"
+            type="text"
+            inputMode="numeric"
             value={input}
-            onChange={e => setInput(e.target.value)}
+            onChange={e => setInput(e.target.value.replace(/[^0-9]/g, ''))}
             onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false) }}
-            className="w-full text-2xl font-bold text-gray-900 border-b-2 border-black outline-none bg-white px-1"
+            onBlur={save}
+            className="w-full text-3xl font-bold text-gray-900 border-0 border-b-2 border-black outline-none bg-transparent p-0 leading-tight"
             autoFocus
           />
-          <button onClick={save} className="text-xs font-medium text-white bg-black rounded-lg px-2.5 py-1 shrink-0">Save</button>
-          <button onClick={() => setEditing(false)} className="text-xs text-gray-400 shrink-0">Cancel</button>
+          <p className="text-xs text-gray-400 mt-1">Press Enter to save</p>
         </div>
       ) : (
-        <>
-          <p className="text-3xl font-bold text-gray-900 mt-1">{downloads.toLocaleString()}</p>
-          <button
-            onClick={startEdit}
-            className="absolute top-4 right-4 text-xs text-gray-400 hover:text-gray-700 opacity-0 group-hover:opacity-100 transition-opacity border border-gray-200 rounded px-2 py-0.5"
-          >
-            Edit
-          </button>
-          <p className="text-xs text-gray-400 mt-1">Manually tracked</p>
-        </>
+        <div className="mt-1 cursor-text group/num" onClick={startEdit} title="Click to edit">
+          <p className="text-3xl font-bold text-gray-900 group-hover/num:text-gray-500 transition-colors">
+            {downloads.toLocaleString()}
+          </p>
+          <p className="text-xs text-gray-400 mt-1">Click to edit</p>
+        </div>
       )}
     </div>
   )
