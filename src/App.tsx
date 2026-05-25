@@ -301,24 +301,30 @@ export default function App() {
           </button>
         </div>
 
-        {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
-            <StatCard label="Total Users" value={stats.totalUsers} />
-            <StatCard
-              label="Have Wardrobe Items"
-              value={stats.usersWithItems}
-              sub={pct(stats.usersWithItems, stats.totalUsers)}
-            />
-            <StatCard
-              label="Generated Outfits"
-              value={stats.usersWithOutfits}
-              sub={pct(stats.usersWithOutfits, stats.totalUsers)}
-            />
-            <StatCard label="Total Items Added" value={stats.totalItems} />
-            <StatCard label="Total Outfits Made" value={stats.totalOutfits} />
-            <DownloadsCard />
-          </div>
-        )}
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
+          {stats ? (
+            <>
+              <StatCard label="Total Users" value={stats.totalUsers} />
+              <StatCard
+                label="Have Wardrobe Items"
+                value={stats.usersWithItems}
+                sub={pct(stats.usersWithItems, stats.totalUsers)}
+              />
+              <StatCard
+                label="Generated Outfits"
+                value={stats.usersWithOutfits}
+                sub={pct(stats.usersWithOutfits, stats.totalUsers)}
+              />
+              <StatCard label="Total Items Added" value={stats.totalItems} />
+              <StatCard label="Total Outfits Made" value={stats.totalOutfits} />
+            </>
+          ) : (
+            <div className="col-span-5 bg-white rounded-xl border border-gray-200 p-5 flex items-center justify-center text-sm text-gray-400">
+              {loading ? 'Loading…' : 'No data'}
+            </div>
+          )}
+          <DownloadsCard />
+        </div>
 
         {supabaseMisconfigured && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 mb-6 text-sm text-yellow-800">
@@ -333,6 +339,7 @@ export default function App() {
         )}
 
         {stats && <FunnelChart stats={stats} />}
+
 
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="p-4 border-b border-gray-100 flex items-center gap-3">
