@@ -105,7 +105,7 @@ function FunnelChart({ stats, downloads }: { stats: Stats; downloads: number }) 
       label: 'Generated Outfits',
       value: stats.usersWithOutfits,
       color: 'bg-green-500',
-      description: 'Created at least 1 outfit',
+      description: 'Ever created at least 1 outfit',
     },
   ]
 
@@ -190,7 +190,7 @@ export default function App() {
     setLoadError(null)
 
     const [profilesRes, itemsRes, outfitsRes] = await Promise.all([
-      supabase.from('profiles').select('id, display_name, username, created_at, has_ever_added_item'),
+      supabase.from('profiles').select('id, display_name, username, created_at, has_ever_added_item, has_ever_generated_outfit'),
       supabase.from('clothing_items').select('user_id'),
       supabase.from('outfits').select('user_id'),
     ])
@@ -220,7 +220,7 @@ export default function App() {
     setStats({
       totalUsers: rows.length,
       usersWithItems: (profilesRes.data || []).filter((u: any) => u.has_ever_added_item).length,
-      usersWithOutfits: rows.filter(u => u.outfit_count > 0).length,
+      usersWithOutfits: (profilesRes.data || []).filter((u: any) => u.has_ever_generated_outfit).length,
       totalItems: rows.reduce((s, u) => s + u.item_count, 0),
       totalOutfits: rows.reduce((s, u) => s + u.outfit_count, 0),
     })
@@ -306,7 +306,7 @@ export default function App() {
             <>
               <StatCard label="Total Users" value={stats.totalUsers} />
               <StatCard label="Ever Added Item" value={stats.usersWithItems} sub={pct(stats.usersWithItems, stats.totalUsers)} />
-              <StatCard label="Generated Outfits" value={stats.usersWithOutfits} sub={pct(stats.usersWithOutfits, stats.totalUsers)} />
+              <StatCard label="Ever Generated Outfit" value={stats.usersWithOutfits} sub={pct(stats.usersWithOutfits, stats.totalUsers)} />
               <StatCard label="Total Items Added" value={stats.totalItems} />
               <StatCard label="Total Outfits Made" value={stats.totalOutfits} />
             </>
