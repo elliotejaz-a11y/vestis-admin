@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase } from './lib/supabase'
+import { supabase, supabaseMisconfigured } from './lib/supabase'
 
 const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD as string
 
@@ -110,7 +110,7 @@ export default function App() {
   })
 
   useEffect(() => {
-    if (authed) loadData()
+    if (authed && !supabaseMisconfigured) loadData()
   }, [authed])
 
   async function loadData() {
@@ -260,6 +260,12 @@ export default function App() {
             />
             <StatCard label="Total Items Added" value={stats.totalItems} />
             <StatCard label="Total Outfits Made" value={stats.totalOutfits} />
+          </div>
+        )}
+
+        {supabaseMisconfigured && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 mb-6 text-sm text-yellow-800">
+            <strong>Missing env vars:</strong> VITE_SUPABASE_URL and VITE_SUPABASE_SERVICE_KEY must be set in Vercel → Environment Variables, then redeploy.
           </div>
         )}
 
