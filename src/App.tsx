@@ -46,6 +46,25 @@ interface Snapshot {
 
 type DateRange = 'last7' | 'last30' | 'all'
 
+interface SnapshotData {
+  snapshot_date: string
+  total_downloads: number
+  total_users: number
+  users_added_item: number
+  users_generated_outfit: number
+  total_items_added: number
+  total_outfits_made: number
+}
+
+interface SnapshotFields {
+  total_downloads: string
+  total_users: string
+  users_added_item: string
+  users_generated_outfit: string
+  total_items_added: string
+  total_outfits_made: string
+}
+
 function localDateISO(): string {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -188,68 +207,113 @@ function FunnelChart({ stats, downloads }: { stats: Stats; downloads: number }) 
 
 // ─── Snapshot panel ─────────────────────────────────────────────────────────────
 
+const SNAPSHOT_METRIC_FIELDS: Array<{ key: keyof SnapshotFields; label: string }> = [
+  { key: 'total_downloads',        label: 'Total Downloads' },
+  { key: 'total_users',            label: 'Total Users' },
+  { key: 'users_added_item',       label: 'Ever Added Item' },
+  { key: 'users_generated_outfit', label: 'Ever Generated Outfit' },
+  { key: 'total_items_added',      label: 'Total Items Added' },
+  { key: 'total_outfits_made',     label: 'Total Outfits Made' },
+]
+
+function fieldsFromStats(stats: Stats, downloads: number): SnapshotFields {
+  return {
+    total_downloads:        downloads.toString(),
+    total_users:            stats.totalUsers.toString(),
+    users_added_item:       stats.usersWithItems.toString(),
+    users_generated_outfit: stats.usersWithOutfits.toString(),
+    total_items_added:      stats.totalItems.toString(),
+    total_outfits_made:     stats.totalOutfits.toString(),
+  }
+}
+
+function fieldsFromSnapshot(s: Snapshot): SnapshotFields {
+  return {
+    total_downloads:        s.total_downloads.toString(),
+    total_users:            s.total_users.toString(),
+    users_added_item:       s.users_added_item.toString(),
+    users_generated_outfit: s.users_generated_outfit.toString(),
+    total_items_added:      s.total_items_added.toString(),
+    total_outfits_made:     s.total_outfits_made.toString(),
+  }
+}
+
 function SaveSnapshotPanel({
+  stats,
   downloads,
-  existingSnapshot,
+  snapshots,
   onSave,
   onCancel,
   saving,
   error,
 }: {
+  stats: Stats
   downloads: number
-  existingSnapshot: Snapshot | null
-  onSave: (n: number) => void
+  snapshots: Snapshot[]
+  onSave: (data: SnapshotData) => void
   onCancel: () => void
   saving: boolean
   error: string | null
 }) {
-  const [input, setInput] = useState(
-    existingSnapshot != null
-      ? existingSnapshot.total_downloads.toString()
-      : downloads.toString()
-  )
+  const today = localDateISO()
+  const [date, setDate] = useState(today)
+  const [fields, setFields] = useState<SnapshotFields>(() => fieldsFromStats(stats, downloads))
 
-  const todayLabel = new Date().toLocaleDateString('en-GB', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
+  function handleDateChange(newDate: string) {
+    setDate(newDate)
+    const existing = snapshots.find(s => s.snapshot_date === newDate)
+    if (existing) {
+      setFields(fieldsFromSnapshot(existing))
+    } else if (newDate === today) {
+      setFields(fieldsFromStats(stats, downloads))
+    } else {
+      setFields({ total_downloads: '', total_users: '', users_added_item: '', users_generated_outfit: '', total_items_added: '', total_outfits_made: '' })
+    }
+  }
+
+  function setField(key: keyof SnapshotFields, value: string) {
+    setFields(f => ({ ...f, [key]: value.replace(/[^0-9]/g, '') }))
+  }
 
   function confirm() {
-    const n = parseInt(input, 10)
-    if (!isNaN(n) && n >= 0) onSave(n)
+    const parsed: SnapshotData = {
+      snapshot_date:          date,
+      total_downloads:        parseInt(fields.total_downloads, 10) || 0,
+      total_users:            parseInt(fields.total_users, 10) || 0,
+      users_added_item:       parseInt(fields.users_added_item, 10) || 0,
+      users_generated_outfit: parseInt(fields.users_generated_outfit, 10) || 0,
+      total_items_added:      parseInt(fields.total_items_added, 10) || 0,
+      total_outfits_made:     parseInt(fields.total_outfits_made, 10) || 0,
+    }
+    onSave(parsed)
   }
+
+  const existingOnDate = snapshots.some(s => s.snapshot_date === date)
+  const isToday = date === today
 
   return (
     <div className="mt-3 bg-white rounded-xl border border-gray-200 p-4">
-      <div className="flex items-start gap-6 flex-wrap">
-        <div className="flex-1 min-w-48">
-          <p className="text-xs font-medium text-gray-500 mb-0.5">Snapshot date</p>
-          <p className="text-sm text-gray-900">{todayLabel}</p>
-          {existingSnapshot != null && (
-            <p className="text-xs text-amber-600 mt-1">
-              A snapshot for today already exists and will be updated.
-            </p>
-          )}
-        </div>
+      <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
         <div>
-          <label
-            className="text-xs font-medium text-gray-500 block mb-1"
-            htmlFor="snapshot-downloads"
-          >
-            Total Downloads
+          <label className="text-xs font-medium text-gray-500 block mb-1" htmlFor="snapshot-date">
+            Snapshot date
           </label>
           <input
-            id="snapshot-downloads"
-            type="text"
-            inputMode="numeric"
-            value={input}
-            onChange={e => setInput(e.target.value.replace(/[^0-9]/g, ''))}
-            onKeyDown={e => { if (e.key === 'Enter') confirm() }}
-            className="w-36 border border-gray-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-black"
-            autoFocus
+            id="snapshot-date"
+            type="date"
+            value={date}
+            max={today}
+            onChange={e => handleDateChange(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-black"
           />
+          {existingOnDate && (
+            <p className="text-xs text-amber-600 mt-1">
+              A snapshot for this date already exists and will be updated.
+            </p>
+          )}
+          {isToday && !existingOnDate && (
+            <p className="text-xs text-gray-400 mt-1">Stats pre-filled from live data.</p>
+          )}
         </div>
         <div className="flex items-end gap-2">
           <button
@@ -268,8 +332,29 @@ function SaveSnapshotPanel({
           </button>
         </div>
       </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        {SNAPSHOT_METRIC_FIELDS.map(({ key, label }) => (
+          <div key={key}>
+            <label className="text-xs font-medium text-gray-500 block mb-1">{label}</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={fields[key]}
+              onChange={e => setField(key, e.target.value)}
+              placeholder="0"
+              className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-black"
+            />
+          </div>
+        ))}
+      </div>
+
       {error != null && (
-        <p className="text-xs text-red-500 mt-2">{error}</p>
+        <p className="text-xs text-red-500 mt-3">
+          {error.includes('schema cache') || error.includes('does not exist')
+            ? 'Table not found — run admin_analytics_snapshots.sql in the Supabase SQL editor first.'
+            : error}
+        </p>
       )}
     </div>
   )
@@ -573,25 +658,13 @@ export default function App() {
     }
   }
 
-  async function handleSaveSnapshot(downloadsNum: number) {
-    if (!stats) return
+  async function handleSaveSnapshot(data: SnapshotData) {
     setSavingSnapshot(true)
     setSnapshotError(null)
 
     const { error } = await supabase
       .from('admin_analytics_snapshots')
-      .upsert(
-        {
-          snapshot_date: localDateISO(),
-          total_downloads: downloadsNum,
-          total_users: stats.totalUsers,
-          users_added_item: stats.usersWithItems,
-          users_generated_outfit: stats.usersWithOutfits,
-          total_items_added: stats.totalItems,
-          total_outfits_made: stats.totalOutfits,
-        },
-        { onConflict: 'snapshot_date' }
-      )
+      .upsert(data, { onConflict: 'snapshot_date' })
 
     setSavingSnapshot(false)
     if (error) {
@@ -659,9 +732,6 @@ export default function App() {
   const pct = (n: number, total: number) =>
     total === 0 ? '0%' : `${Math.round((n / total) * 100)}% of users`
 
-  const todayStr = localDateISO()
-  const todaysSnapshot = snapshots.find(s => s.snapshot_date === todayStr) ?? null
-
   return (
     <div className="min-h-screen bg-gray-50 p-6 md:p-8">
       <div className="max-w-5xl mx-auto">
@@ -681,7 +751,7 @@ export default function App() {
                       : 'text-gray-500 hover:text-gray-900 border-gray-200 bg-white'
                   }`}
                 >
-                  Save Today's Snapshot
+                  Save Snapshot
                 </button>
               )}
               <button
@@ -695,8 +765,9 @@ export default function App() {
 
           {showSnapshotPanel && stats && (
             <SaveSnapshotPanel
+              stats={stats}
               downloads={downloads}
-              existingSnapshot={todaysSnapshot}
+              snapshots={snapshots}
               onSave={handleSaveSnapshot}
               onCancel={() => { setShowSnapshotPanel(false); setSnapshotError(null) }}
               saving={savingSnapshot}
