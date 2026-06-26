@@ -607,23 +607,17 @@ export default function App() {
     setLoading(true)
     setLoadError(null)
 
-    const [profilesRes, itemCountsRes, outfitCountsRes] = await Promise.all([
-      supabase.from('profiles').select('id, display_name, username, created_at, has_ever_added_item, has_ever_generated_outfit'),
+    const [profilesRes, itemCountsRes] = await Promise.all([
+      supabase.from('profiles').select('id, display_name, username, created_at, has_ever_added_item, has_ever_generated_outfit, total_outfits_generated'),
       supabase.rpc('admin_clothing_item_counts'),
-      supabase.rpc('admin_outfit_counts'),
     ])
 
     if (profilesRes.error) { setLoadError(`Profiles error: ${profilesRes.error.message}`); setLoading(false); return }
     if (itemCountsRes.error) { setLoadError(`Item counts error: ${itemCountsRes.error.message}`); setLoading(false); return }
-    if (outfitCountsRes.error) { setLoadError(`Outfit counts error: ${outfitCountsRes.error.message}`); setLoading(false); return }
 
     const itemCounts = new Map<string, number>()
     ;(itemCountsRes.data as Array<{ user_id: string; item_count: number }>)?.forEach(r =>
       itemCounts.set(r.user_id, r.item_count)
-    )
-    const outfitCounts = new Map<string, number>()
-    ;(outfitCountsRes.data as Array<{ user_id: string; outfit_count: number }>)?.forEach(r =>
-      outfitCounts.set(r.user_id, r.outfit_count)
     )
 
     const rows: UserRow[] = (profilesRes.data || []).map((u: any) => ({
@@ -632,7 +626,7 @@ export default function App() {
       username: u.username,
       created_at: u.created_at,
       item_count: itemCounts.get(u.id) ?? 0,
-      outfit_count: outfitCounts.get(u.id) ?? 0,
+      outfit_count: (u.total_outfits_generated as number) ?? 0,
     }))
 
     setStats({
